@@ -5,7 +5,7 @@ FedPS is a Python module designed for data preprocessing in Federated Learning, 
 1. Local Statistics Estimation: Clients estimate local statistics from their local data.
 2. Aggregation: The server receives the local statistics and performs aggregation.
 3. Global Parameter Calculation: The server calculates the global preprocessing parameters.
-4. Parameter Distribution: Clients receive the preprocessing parameters from the server.
+4. Parameter Distribution: The global parameters are then sent back to the clients.
 5. Data Preprocessing: Clients apply the preprocessing to their local data.
 
 <div align=center>
@@ -34,7 +34,7 @@ conda activate fedps
 2. Clone this project
 
 ```bash
-git clone https://github.com/primihub/fedps.git
+git clone https://github.com/xuefeng-xu/fedps.git
 ```
 
 3. Build the project
@@ -161,6 +161,6 @@ PS: See more cases in the [example](example) folder.
 - [`IterativeImputer`](https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html) does not support the `sample_posterior` and `n_nearest_features` parameters.
 - [`KNNImputer`](https://scikit-learn.org/stable/modules/generated/sklearn.impute.KNNImputer.html) does not support custom weight funtion and distance metric.
 
-## License
+## Acknowledgement
 
-[Apache 2.0](LICENSE)
+This project is build on [Scikit-learn](https://github.com/scikit-learn/scikit-learn).

@@ -5,7 +5,7 @@ labels: ['bug']
 body:
 - type: markdown
   attributes:
-    value: Before submitting a bug, please check the existing [issues](https://github.com/primihub/fedps/issues).
+    value: Before submitting a bug, please check the existing [issues](https://github.com/xuefeng-xu/fedps/issues).
 - type: textarea
   attributes:
     label: Describe the bug
