@@ -30,6 +30,8 @@ from ..sketch import (
 )
 from ..stats.norm import col_norm_client, col_norm_server
 
+__all__ = ["IterativeImputer", "KNNImputer", "SimpleImputer"]
+
 
 class IterativeImputer(_PreprocessBase):
     def __init__(
@@ -98,6 +100,23 @@ class IterativeImputer(_PreprocessBase):
             X_missing_mask = _get_mask(X, self.module.missing_values)
             mask_missing_values = X_missing_mask.copy()
 
+            if in_fit:
+                self.module._is_empty_feature = np.all(mask_missing_values, axis=0)
+                if self.FL_type == "H":
+                    self.channel.send(
+                        "_is_empty_feature", self.module._is_empty_feature
+                    )
+                    self.module._is_empty_feature = self.channel.recv(
+                        "_is_empty_feature"
+                    )
+        else:
+            if in_fit and self.FL_type == "H":
+                _is_empty_feature = self.channel.recv_all("_is_empty_feature")
+                self.module._is_empty_feature = np.all(_is_empty_feature, axis=0)
+                self.channel.send_all(
+                    "_is_empty_feature", self.module._is_empty_feature
+                )
+
         if self.module.initial_imputer_ is None:
             self.module.initial_imputer_ = SimpleImputer(
                 FL_type=self.FL_type,
@@ -117,24 +136,28 @@ class IterativeImputer(_PreprocessBase):
         elif self.role == "client":
             X_filled = self.module.initial_imputer_.transform(X)
 
-        valid_mask = np.logical_not(
-            np.isnan(self.module.initial_imputer_.module.statistics_)
-        )
-
         if self.role == "client":
             if not self.module.keep_empty_features:
                 # drop empty features
-                Xt = X[:, valid_mask]
-                mask_missing_values = mask_missing_values[:, valid_mask]
+                Xt = X[:, ~self.module._is_empty_feature]
+                mask_missing_values = mask_missing_values[
+                    :, ~self.module._is_empty_feature
+                ]
+
+                if (
+                    self.module.initial_imputer_.module.get_params()["strategy"]
+                    == "constant"
+                ):
+                    X_filled = X_filled[:, ~self.module._is_empty_feature]
             else:
                 # mark empty features as not missing and keep the original
                 # imputation
-                mask_missing_values[:, valid_mask] = True
+                mask_missing_values[:, self.module._is_empty_feature] = False
                 Xt = X
-            return Xt, X_filled, mask_missing_values, X_missing_mask, valid_mask
-
-        elif self.role == "server":
-            return valid_mask
+                Xt[:, self.module._is_empty_feature] = X_filled[
+                    :, self.module._is_empty_feature
+                ]
+            return Xt, X_filled, mask_missing_values, X_missing_mask
 
     def _H_get_ordered_idx_client(self, mask_missing_values):
         if self.module.skip_complete or self.module.imputation_order in (
@@ -391,11 +414,11 @@ class IterativeImputer(_PreprocessBase):
         self.module.initial_imputer_ = None
 
         if self.role == "client":
-            X, Xt, mask_missing_values, complete_mask, valid_mask = (
-                self._initial_imputation(X, in_fit=True)
+            X, Xt, mask_missing_values, complete_mask = self._initial_imputation(
+                X, in_fit=True
             )
 
-            valid_n_features = sum(valid_mask)
+            valid_n_features = sum(~self.module._is_empty_feature)
 
             self.module._fit_indicator(complete_mask)
             X_indicator = self.module._transform_indicator(complete_mask)
@@ -406,10 +429,18 @@ class IterativeImputer(_PreprocessBase):
 
             n_features = Xt.shape[1]
             self.module._min_value = self.module._validate_limit(
-                self.module.min_value, "min", n_features
+                self.module.min_value,
+                "min",
+                n_features,
+                self.module._is_empty_feature,
+                self.module.keep_empty_features,
             )
             self.module._max_value = self.module._validate_limit(
-                self.module.max_value, "max", n_features
+                self.module.max_value,
+                "max",
+                n_features,
+                self.module._is_empty_feature,
+                self.module.keep_empty_features,
             )
 
             if not np.all(np.greater(self.module._max_value, self.module._min_value)):
@@ -418,15 +449,15 @@ class IterativeImputer(_PreprocessBase):
             ordered_idx = self._H_get_ordered_idx_client(mask_missing_values)
 
         elif self.role == "server":
-            valid_mask = self._initial_imputation(X=None, in_fit=True)
-            valid_n_features = sum(valid_mask)
+            self._initial_imputation(X=None, in_fit=True)
+            valid_n_features = sum(~self.module._is_empty_feature)
 
             if self.module.max_iter == 0 or valid_n_features <= 1:
                 self.module.n_iter_ = 0
                 return
 
             if self.module.keep_empty_features:
-                n_features = valid_mask.shape[0]
+                n_features = self.module._is_empty_feature.shape[0]
             else:
                 n_features = valid_n_features
 
@@ -474,6 +505,7 @@ class IterativeImputer(_PreprocessBase):
                         neighbor_feat_idx,
                         estimator=None,
                         fit_mode=True,
+                        params={},
                     )
                 elif self.role == "server":
                     estimator = self._H_impute_one_feature_server()
@@ -556,11 +588,11 @@ class IterativeImputer(_PreprocessBase):
         self.module.initial_imputer_ = None
 
         if self.role == "client":
-            X, Xt, mask_missing_values, complete_mask, valid_mask = (
-                self._initial_imputation(X, in_fit=True)
+            X, Xt, mask_missing_values, complete_mask = self._initial_imputation(
+                X, in_fit=True
             )
 
-            valid_n_features = sum(valid_mask)
+            valid_n_features = sum(~self.module._is_empty_feature)
             self.channel.send("valid_n_features", valid_n_features)
             valid_n_features = self.channel.recv("valid_n_features")
 
@@ -574,10 +606,18 @@ class IterativeImputer(_PreprocessBase):
             n_features = Xt.shape[1]
 
             self.module._min_value = self.module._validate_limit(
-                self.module.min_value, "min", n_features
+                self.module.min_value,
+                "min",
+                n_features,
+                self.module._is_empty_feature,
+                self.module.keep_empty_features,
             )
             self.module._max_value = self.module._validate_limit(
-                self.module.max_value, "max", n_features
+                self.module.max_value,
+                "max",
+                n_features,
+                self.module._is_empty_feature,
+                self.module.keep_empty_features,
             )
 
             if not np.all(np.greater(self.module._max_value, self.module._min_value)):
@@ -758,13 +798,13 @@ class IterativeImputer(_PreprocessBase):
         check_is_fitted(self.module)
 
         if self.role == "client":
-            X, Xt, mask_missing_values, complete_mask, valid_mask = (
-                self._initial_imputation(X, in_fit=False)
+            X, Xt, mask_missing_values, complete_mask = self._initial_imputation(
+                X, in_fit=False
             )
 
             n_samples, n_features = Xt.shape
 
-            valid_n_features = sum(valid_mask)
+            valid_n_features = sum(~self.module._is_empty_feature)
             self.channel.send("valid_n_features", valid_n_features)
             valid_n_features = self.channel.recv("valid_n_features")
 
