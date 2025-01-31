@@ -103,7 +103,7 @@ def col_min_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -163,7 +163,7 @@ def col_max_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -223,7 +223,7 @@ def col_min_max_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -289,7 +289,7 @@ def row_min_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -349,7 +349,7 @@ def row_max_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -409,7 +409,7 @@ def row_min_max_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:

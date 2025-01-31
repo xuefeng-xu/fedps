@@ -38,7 +38,7 @@ class MaxAbsScaler(_PreprocessBase):
             X = self.module._validate_data(
                 X,
                 dtype=FLOAT_DTYPES,
-                force_all_finite="allow-nan",
+                ensure_all_finite="allow-nan",
             )
             self.module.n_samples_seen_ = X.shape[0]
 
@@ -88,7 +88,7 @@ class MinMaxScaler(_PreprocessBase):
             X = self.module._validate_data(
                 X,
                 dtype=FLOAT_DTYPES,
-                force_all_finite="allow-nan",
+                ensure_all_finite="allow-nan",
             )
             self.module.n_samples_seen_ = X.shape[0]
 
@@ -204,7 +204,7 @@ class RobustScaler(_PreprocessBase):
             X = self.module._validate_data(
                 X,
                 dtype=FLOAT_DTYPES,
-                force_all_finite="allow-nan",
+                ensure_all_finite="allow-nan",
             )
 
             if with_centering or with_scaling:
@@ -303,7 +303,7 @@ class StandardScaler(_PreprocessBase):
             X = self.module._validate_data(
                 X,
                 dtype=FLOAT_DTYPES,
-                force_all_finite="allow-nan",
+                ensure_all_finite="allow-nan",
             )
 
             self.module.n_samples_seen_ = np.repeat(X.shape[0], X.shape[1])

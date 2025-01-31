@@ -57,7 +57,7 @@ class _BaseEncoder(_PreprocessBase, _SKL_BaseEncoder):
             fit_results = self._fit(
                 X,
                 handle_unknown=self.module.handle_unknown,
-                force_all_finite="allow-nan",
+                ensure_all_finite="allow-nan",
                 return_counts=infrequent_enabled,
                 return_and_ignore_missing_for_infrequent=True,
             )
@@ -571,7 +571,7 @@ class TargetEncoder(_PreprocessBase, _SKL_BaseEncoder, auto_wrap_output_keys=Non
 
         if self.role == "client":
             check_consistent_length(X, y)
-            self._fit(X, handle_unknown="ignore", force_all_finite="allow-nan")
+            self._fit(X, handle_unknown="ignore", ensure_all_finite="allow-nan")
             self.module.n_features_in_ = self.n_features_in_
             if hasattr(self, "feature_names_in_"):
                 self.module.feature_names_in_ = self.feature_names_in_
@@ -620,7 +620,7 @@ class TargetEncoder(_PreprocessBase, _SKL_BaseEncoder, auto_wrap_output_keys=Non
             self.module.target_mean_ = self.channel.recv("target_mean")
 
             X_ordinal, X_known_mask = self._transform(
-                X, handle_unknown="ignore", force_all_finite="allow-nan"
+                X, handle_unknown="ignore", ensure_all_finite="allow-nan"
             )
             n_categories = np.fromiter(
                 (

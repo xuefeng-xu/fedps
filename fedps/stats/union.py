@@ -37,7 +37,7 @@ def col_union_client(
 ):
     check_channel(channel, send_server, recv_server)
     X, _, _ = _BaseEncoder()._check_X(
-        X, force_all_finite="allow-nan" if ignore_nan else True
+        X, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     client_col_items = []

@@ -43,7 +43,7 @@ def col_sum_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:
@@ -103,7 +103,7 @@ def row_sum_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if ignore_nan:

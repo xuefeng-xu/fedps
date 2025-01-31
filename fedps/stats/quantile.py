@@ -80,7 +80,7 @@ def col_quantile_client(
     quantiles = check_quantiles(quantiles)
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     if send_server:

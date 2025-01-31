@@ -43,7 +43,7 @@ def col_mean_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     client_col_n = X.shape[0]
@@ -119,7 +119,7 @@ def col_var_client(
 ):
     check_channel(channel, send_server, recv_server)
     X = check_array(
-        X, dtype=FLOAT_DTYPES, force_all_finite="allow-nan" if ignore_nan else True
+        X, dtype=FLOAT_DTYPES, ensure_all_finite="allow-nan" if ignore_nan else True
     )
 
     client_col_n = X.shape[0]

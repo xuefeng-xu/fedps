@@ -82,9 +82,9 @@ class IterativeImputer(_PreprocessBase):
             return
 
         if is_scalar_nan(self.module.missing_values):
-            force_all_finite = "allow-nan"
+            ensure_all_finite = "allow-nan"
         else:
-            force_all_finite = True
+            ensure_all_finite = True
 
         if self.role == "client":
             X = self.module._validate_data(
@@ -92,7 +92,7 @@ class IterativeImputer(_PreprocessBase):
                 dtype=FLOAT_DTYPES,
                 order="F",
                 reset=in_fit,
-                force_all_finite=force_all_finite,
+                ensure_all_finite=ensure_all_finite,
             )
             _check_inputs_dtype(X, self.module.missing_values)
 
@@ -936,9 +936,9 @@ class KNNImputer(_PreprocessBase):
     def Htrasform(self, X):
         check_is_fitted(self.module)
         if not is_scalar_nan(self.module.missing_values):
-            force_all_finite = True
+            ensure_all_finite = True
         else:
-            force_all_finite = "allow-nan"
+            ensure_all_finite = "allow-nan"
 
         valid_mask = self.module._valid_mask
 
@@ -950,7 +950,7 @@ class KNNImputer(_PreprocessBase):
                     X,
                     accept_sparse=False,
                     dtype=FLOAT_DTYPES,
-                    force_all_finite=force_all_finite,
+                    ensure_all_finite=ensure_all_finite,
                     copy=self.module.copy,
                     reset=False,
                 )
@@ -1039,7 +1039,7 @@ class KNNImputer(_PreprocessBase):
                 self.module._fit_X,
                 metric=self.module.metric,
                 missing_values=self.module.missing_values,
-                force_all_finite=force_all_finite,
+                ensure_all_finite=ensure_all_finite,
                 reduce_func=process_chunk,
             )
             for chunk in gen:
@@ -1210,9 +1210,9 @@ class KNNImputer(_PreprocessBase):
 
     def Vtrasform(self, X):
         if not is_scalar_nan(self.module.missing_values):
-            force_all_finite = True
+            ensure_all_finite = True
         else:
-            force_all_finite = "allow-nan"
+            ensure_all_finite = "allow-nan"
 
         if self.role == "client":
             check_is_fitted(self.module)
@@ -1220,7 +1220,7 @@ class KNNImputer(_PreprocessBase):
                 X,
                 accept_sparse=False,
                 dtype=FLOAT_DTYPES,
-                force_all_finite=force_all_finite,
+                ensure_all_finite=ensure_all_finite,
                 copy=self.module.copy,
                 reset=False,
             )
@@ -1275,7 +1275,7 @@ class KNNImputer(_PreprocessBase):
                 self.module._fit_X,
                 metric=self.module.metric,
                 missing_values=self.module.missing_values,
-                force_all_finite=force_all_finite,
+                ensure_all_finite=ensure_all_finite,
                 reduce_func=process_chunk,
             )
             for chunk in gen:

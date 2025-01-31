@@ -600,7 +600,7 @@ class PowerTransformer(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
             ensure_2d=True,
             dtype=FLOAT_DTYPES,
             copy=self.copy,
-            force_all_finite="allow-nan",
+            ensure_all_finite="allow-nan",
             reset=in_fit,
         )
 
