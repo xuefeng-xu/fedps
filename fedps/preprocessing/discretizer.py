@@ -4,6 +4,7 @@ from math import ceil
 from sklearn.preprocessing import KBinsDiscretizer as SKL_KBinsDiscretizer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import resample
+from sklearn.utils.validation import validate_data
 from .base import _PreprocessBase
 from .util import validate_quantile_sketch_params
 from ..stats import col_min_max
@@ -61,7 +62,7 @@ class KBinsDiscretizer(_PreprocessBase):
         validate_quantile_sketch_params(self)
 
         if self.role == "client":
-            X = self.module._validate_data(X, dtype="numeric")
+            X = validate_data(self.module, X, dtype="numeric")
 
             n_samples, n_features = X.shape
             n_bins = self.module._validate_n_bins(n_features)

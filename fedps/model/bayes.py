@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.linear_model import BayesianRidge as SKL_BayesianRidge
 from sklearn.linear_model._base import _preprocess_data
 from sklearn.utils import check_array
-from sklearn.utils.validation import FLOAT_DTYPES
+from sklearn.utils.validation import validate_data, FLOAT_DTYPES
 from .base import _ModelBase
 
 
@@ -199,8 +199,8 @@ class BayesianRidge(_ModelBase):
 
     def Hfit(self, X, y):
         if self.role == "client":
-            X, y = self.module._validate_data(
-                X, y, dtype=[np.float64, np.float32], y_numeric=True
+            X, y = validate_data(
+                self.module, X, y, dtype=[np.float64, np.float32], y_numeric=True
             )
 
             n_samples, n_features = X.shape
@@ -391,8 +391,12 @@ class BayesianRidge(_ModelBase):
             if y is not None:
                 # Edge case: client only has y and has no features
                 if X is not None:
-                    X, y = self.module._validate_data(
-                        X, y, dtype=[np.float64, np.float32], y_numeric=True
+                    X, y = validate_data(
+                        self.module,
+                        X,
+                        y,
+                        dtype=[np.float64, np.float32],
+                        y_numeric=True,
                     )
 
                     X, y, X_offset_, y_offset_, _ = _preprocess_data(
@@ -411,8 +415,8 @@ class BayesianRidge(_ModelBase):
 
             else:
                 # y is None, X is not None
-                X = self.module._validate_data(
-                    X, y="no_validation", dtype=[np.float64, np.float32]
+                X = validate_data(
+                    self.module, X, y="no_validation", dtype=[np.float64, np.float32]
                 )
 
                 X, X_offset_ = _V_preprocess_data_client_no_y(

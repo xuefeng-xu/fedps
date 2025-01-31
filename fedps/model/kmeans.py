@@ -5,7 +5,11 @@ from sklearn.cluster import KMeans as SKL_KMeans
 from sklearn.cluster._k_means_common import _is_same_clustering
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import check_random_state
-from sklearn.utils.validation import check_array, _is_arraylike_not_scalar
+from sklearn.utils.validation import (
+    check_array,
+    validate_data,
+    _is_arraylike_not_scalar,
+)
 from sklearn.utils._openmp_helpers import _openmp_effective_n_threads
 from .base import _ModelBase
 from ..stats.mean_var import col_mean, col_var_client, col_var_server
@@ -269,7 +273,8 @@ class KMeans(_ModelBase):
     def Hfit(self, X):
         self.module._validate_params()
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=[np.float64, np.float32],
                 order="C",

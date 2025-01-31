@@ -6,7 +6,7 @@ from sklearn.preprocessing import Normalizer as SKL_Normalizer
 from sklearn.preprocessing import RobustScaler as SKL_RobustScaler
 from sklearn.preprocessing import StandardScaler as SKL_StandardScaler
 from sklearn.preprocessing._data import _handle_zeros_in_scale, _is_constant_feature
-from sklearn.utils.validation import check_array, FLOAT_DTYPES
+from sklearn.utils.validation import check_array, validate_data, FLOAT_DTYPES
 from .base import _PreprocessBase
 from .util import validate_quantile_sketch_params
 from ..stats import col_norm, row_norm, col_min_max
@@ -35,7 +35,8 @@ class MaxAbsScaler(_PreprocessBase):
     def Hfit(self, X):
         self.module._validate_params()
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=FLOAT_DTYPES,
                 ensure_all_finite="allow-nan",
@@ -85,7 +86,8 @@ class MinMaxScaler(_PreprocessBase):
             )
 
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=FLOAT_DTYPES,
                 ensure_all_finite="allow-nan",
@@ -129,7 +131,7 @@ class Normalizer(_PreprocessBase):
         else:
             if self.role == "client":
                 copy = copy if copy is not None else self.module.copy
-                X = self.module._validate_data(X, reset=False)
+                X = validate_data(self.module, X, reset=False)
                 X = check_array(
                     X,
                     copy=copy,
@@ -201,7 +203,8 @@ class RobustScaler(_PreprocessBase):
             scale = None
 
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=FLOAT_DTYPES,
                 ensure_all_finite="allow-nan",
@@ -300,7 +303,8 @@ class StandardScaler(_PreprocessBase):
             scale = None
 
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=FLOAT_DTYPES,
                 ensure_all_finite="allow-nan",

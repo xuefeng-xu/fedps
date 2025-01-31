@@ -8,7 +8,7 @@ from sklearn.base import (
     TransformerMixin,
     _fit_context,
 )
-from sklearn.utils.validation import FLOAT_DTYPES, check_is_fitted
+from sklearn.utils.validation import validate_data, FLOAT_DTYPES, check_is_fitted
 from sklearn.utils._param_validation import StrOptions
 
 
@@ -595,7 +595,8 @@ class PowerTransformer(OneToOneFeatureMixin, TransformerMixin, BaseEstimator):
         return yeojohnson_normmax(x[~mask])
 
     def _check_input(self, X, in_fit, check_positive=False, check_shape=False):
-        X = self._validate_data(
+        X = validate_data(
+            self,
             X,
             ensure_2d=True,
             dtype=FLOAT_DTYPES,

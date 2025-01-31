@@ -7,6 +7,7 @@ from ._power import PowerTransformer as SKL_PowerTransformer
 from sklearn.preprocessing import QuantileTransformer as SKL_QuantileTransformer
 from sklearn.preprocessing import SplineTransformer as SKL_SplineTransformer
 from sklearn.utils import check_array, resample
+from sklearn.utils.validation import validate_data
 from .base import _PreprocessBase
 from ._power import (
     _yeojohnson_transform,
@@ -305,7 +306,8 @@ class SplineTransformer(_PreprocessBase):
                 raise ValueError("knots must be sorted without duplicates.")
 
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 reset=True,
                 ensure_min_samples=2,

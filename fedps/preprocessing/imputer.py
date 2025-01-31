@@ -15,7 +15,7 @@ from sklearn.neighbors._base import _get_weights
 from sklearn.utils import _safe_indexing, check_random_state
 from sklearn.utils._encode import _unique
 from sklearn.utils._mask import _get_mask
-from sklearn.utils.validation import FLOAT_DTYPES, check_is_fitted
+from sklearn.utils.validation import validate_data, FLOAT_DTYPES, check_is_fitted
 from .base import _PreprocessBase
 from .util import validate_quantile_sketch_params
 from ..sketch import (
@@ -87,7 +87,8 @@ class IterativeImputer(_PreprocessBase):
             ensure_all_finite = True
 
         if self.role == "client":
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 dtype=FLOAT_DTYPES,
                 order="F",
@@ -946,7 +947,8 @@ class KNNImputer(_PreprocessBase):
             if X is None:
                 self.channel.send("X_nan", None)
             else:
-                X = self.module._validate_data(
+                X = validate_data(
+                    self.module,
                     X,
                     accept_sparse=False,
                     dtype=FLOAT_DTYPES,
@@ -1216,7 +1218,8 @@ class KNNImputer(_PreprocessBase):
 
         if self.role == "client":
             check_is_fitted(self.module)
-            X = self.module._validate_data(
+            X = validate_data(
+                self.module,
                 X,
                 accept_sparse=False,
                 dtype=FLOAT_DTYPES,
