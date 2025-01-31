@@ -17,7 +17,7 @@ FedPS is a Python module designed for data preprocessing in Federated Learning, 
 ### Dependencies
 
 - Python (>= 3.9)
-- Scikit-learn (>= 1.4)
+- Scikit-learn (~= 1.6)
 - NumPy (>= 1.20)
 - DataSketches
 - PyZMQ

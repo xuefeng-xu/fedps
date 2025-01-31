@@ -2,10 +2,8 @@ import warnings
 import numpy as np
 from sklearn.utils._encode import _unique
 from sklearn.preprocessing._encoders import _BaseEncoder
+from sklearn.utils._missing import is_scalar_nan
 from .util import check_channel, check_FL_type, check_role
-from ..util import import_is_scalar_nan
-
-is_scalar_nan = import_is_scalar_nan()
 
 
 def col_union(FL_type: str, role: str, X=None, ignore_nan: bool = True, channel=None):

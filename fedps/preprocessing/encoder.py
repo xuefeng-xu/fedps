@@ -6,14 +6,12 @@ from sklearn.preprocessing import TargetEncoder as SKL_TargetEncoder
 from sklearn.preprocessing._encoders import _BaseEncoder as _SKL_BaseEncoder
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_consistent_length, _check_y
+from sklearn.utils._missing import is_scalar_nan
 from sklearn.utils._param_validation import RealNotInt
 from .base import _PreprocessBase
 from .util import validatea_freq_sketch_params
 from ..sketch import send_local_fi_sketch, merge_local_fi_sketch, get_frequent_items
 from ..stats.union import items_union
-from ..util import import_is_scalar_nan
-
-is_scalar_nan = import_is_scalar_nan()
 
 __all__ = ["OneHotEncoder", "OrdinalEncoder", "TargetEncoder"]
 
