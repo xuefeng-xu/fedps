@@ -16,8 +16,8 @@ FedPS is a Python module designed for data preprocessing in Federated Learning, 
 
 ### Dependencies
 
-- Python (>= 3.9)
-- Scikit-learn (~= 1.6)
+- Python (>= 3.10)
+- Scikit-learn (~= 1.7)
 - NumPy (>= 1.20)
 - DataSketches
 - PyZMQ
@@ -27,21 +27,20 @@ FedPS is a Python module designed for data preprocessing in Federated Learning, 
 1. Create a Python env
 
 ```bash
-conda create --name fedps python=3.9
+conda create --name fedps python=3.10
 conda activate fedps
 ```
 
 2. Clone this project
 
 ```bash
-git clone https://github.com/xuefeng-xu/fedps.git
+git clone https://github.com/xuefeng-xu/fedps.git && cd fedps
 ```
 
 3. Build the project
 
 ```bash
-cd fedps
-pip install .
+pip install -e .
 ```
 
 ## Usage

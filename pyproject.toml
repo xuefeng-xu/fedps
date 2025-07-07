@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "fedps"
 version = "0.1.0a0"
 dependencies = [
-    "scikit-learn~=1.6",
+    "scikit-learn~=1.7",
     "numpy>=1.20",
     "datasketches",
     "pyzmq",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "Xuefeng Xu"},
 ]
