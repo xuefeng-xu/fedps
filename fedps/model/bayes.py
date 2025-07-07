@@ -297,11 +297,6 @@ class BayesianRidge(_ModelBase):
 
             eigen_vals_, eigen_vecs_ = np.linalg.eigh(XT_X)
 
-            # remove zero eigenvalues and corresponding eigenvectors
-            if n_samples < n_features:
-                eigen_vals_ = eigen_vals_[-n_samples:]
-                eigen_vecs_ = eigen_vecs_[:, -n_samples:]
-
             XT_y = sum(self.channel.recv_all("XT_y"))
 
         self.module.scores_ = list()
@@ -502,11 +497,6 @@ class BayesianRidge(_ModelBase):
                     X_XT += cX_XT
 
             eigen_vals_, eigen_vecs_ = np.linalg.eigh(X_XT)
-
-            # remove zero eigenvalues and corresponding eigenvectors
-            if n_features < n_samples:
-                eigen_vals_ = eigen_vals_[-n_features:]
-                eigen_vecs_ = eigen_vecs_[:, -n_features:]
 
         self.module.scores_ = list()
         coef_old_ = None
