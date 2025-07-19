@@ -157,6 +157,7 @@ PS: See more cases in the [example](example) folder.
 
 - Currently, this library does not support sparse data.
 - [`KBinsDiscretizer`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.KBinsDiscretizer.html), [`StandardScaler`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html), and [`SplineTransformer`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.SplineTransformer.html) cannot set the `sample_weight` parameter in their fit methods.
+- [`KBinsDiscretizer`](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.KBinsDiscretizer.html) does not support the `quantile_method` parameter.
 - [`IterativeImputer`](https://scikit-learn.org/stable/modules/generated/sklearn.impute.IterativeImputer.html) does not support the `sample_posterior` and `n_nearest_features` parameters.
 - [`KNNImputer`](https://scikit-learn.org/stable/modules/generated/sklearn.impute.KNNImputer.html) does not support custom weight funtion and distance metric.
 
