@@ -30,24 +30,32 @@ def _log_var(logx):
     return np.real(special.logsumexp(2 * logxmu, axis=0)) - np.log(len(logx))
 
 
-def _log_var_server(n_samples, channel):
-    logsum = channel.recv_all("logsum")
-    logmean = special.logsumexp(logsum, axis=0) - np.log(n_samples)
-    channel.send_all("logmean", logmean)
-
-    logsum_xmu = channel.recv_all("logsum_xmu")
-    return np.real(special.logsumexp(logsum_xmu, axis=0)) - np.log(n_samples)
-
-
-def _log_var_client(logx, channel):
-    logsum = special.logsumexp(logx, axis=0)
-    channel.send("logsum", logsum)
-    logmean = channel.recv("logmean")
-
+def pairwise_var_client(logx):
+    # log of mean(x) and log of sum of (x-mean(x))^2
+    # use two-pass method at client side
+    logmean = special.logsumexp(logx) - np.log(len(logx))
     pij = np.full_like(logx, np.pi * 1j, dtype=np.complex128)
     logxmu = special.logsumexp([logx, logmean + pij], axis=0)
-    logsum_xmu = special.logsumexp(2 * logxmu, axis=0)
-    channel.send("logsum_xmu", logsum_xmu)
+    logM2 = np.real(special.logsumexp(2 * logxmu, axis=0))
+    return logmean, logM2
+
+
+def pairwise_var_server(triplet):
+    while len(triplet) >= 2:
+        n_1, logmean_1, logM2_1 = triplet.pop(0)
+        n_2, logmean_2, logM2_2 = triplet.pop(0)
+
+        n = n_1 + n_2
+        logdelta = special.logsumexp([logmean_2, logmean_1 + np.pi * 1j], axis=0)
+        logmean = special.logsumexp([logmean_1, logdelta + np.log(n_2 / n)], axis=0)
+        logM2 = special.logsumexp(
+            [logM2_1, logM2_2, 2 * logdelta + np.log(n_1 * n_2 / n)], axis=0
+        )
+
+        triplet.append((n, logmean, logM2))
+
+    n, logmean, logM2 = triplet[0]
+    return n, logmean, np.real(logM2)
 
 
 def boxcox_llf(lmb, data):
@@ -73,21 +81,40 @@ def boxcox_llf(lmb, data):
     return (lmb - 1) * np.sum(logdata, axis=0) - n_samples / 2 * logvar
 
 
-def boxcox_llf_server(lmb, n_samples, constant, channel):
+def boxcox_llf_server(lmb, channel):
     channel.send_all("lmb", lmb)
-    logvar = _log_var_server(n_samples, channel)
-    if lmb != 0:
-        logvar -= 2 * np.log(abs(lmb))
-    return (lmb - 1) * constant - n_samples / 2 * logvar
+    c = 0
+    triplet = []
+
+    for c_i, n_i, logmean_i, logM2_i in channel.recv_all("c_n_mu_m2"):
+        if n_i == 0:
+            continue
+
+        c += c_i
+
+        triplet.append((n_i, logmean_i, logM2_i))
+
+    n, _, logM2 = pairwise_var_server(triplet)
+    if abs(lmb) >= np.spacing(1.0):
+        logM2 -= 2 * np.log(abs(lmb))
+
+    logvar = logM2 - np.log(n)
+    return (lmb - 1) * c - n / 2 * logvar
 
 
 def boxcox_llf_client(lmb, data, channel):
-    if lmb == 0:
-        bc = np.array(np.log(data), dtype=np.complex128)
-        logbc = np.log(bc)
-    else:
-        logbc = lmb * np.log(data)
-    _log_var_client(logbc, channel)
+    logx = np.log(data)
+    if abs(lmb) < np.spacing(1.0):
+        with np.errstate(divide="ignore"):
+            logbc = np.log(logx + 0j)
+    else:  # lmb != 0
+        # - np.log(abs(lmb)) is computed at server side
+        logbc = lmb * logx
+
+    logmean, logM2 = pairwise_var_client(logbc)
+    c = np.sum(logx)
+    n = len(data)
+    channel.send("c_n_mu_m2", [c, n, logmean, logM2])
 
 
 def _boxcox_inv_lmbda(x, y):
@@ -158,8 +185,8 @@ def boxcox_normmax(x, brack=(-2, 2), *, ymax=_BigFloat()):
 
 
 def boxcox_normmax_server(channel, brack=(-2, 2), *, ymax=_BigFloat()):
-    def _neg_llf(lmb, n_samples, constant, channel):
-        return -boxcox_llf_server(lmb, n_samples, constant, channel)
+    def _neg_llf(lmb, channel):
+        return -boxcox_llf_server(lmb, channel)
 
     end_msg = "exceed specified `ymax`."
     if isinstance(ymax, _BigFloat):
@@ -170,11 +197,7 @@ def boxcox_normmax_server(channel, brack=(-2, 2), *, ymax=_BigFloat()):
     elif ymax <= 0:
         raise ValueError("`ymax` must be strictly positive")
 
-    n_samples_constant = channel.recv_all("n_samples_constant")
-    n_samples_constant = np.sum(n_samples_constant, axis=0)
-    n_samples, constant = n_samples_constant[0], n_samples_constant[1]
-
-    lmax = optimize.brent(_neg_llf, brack=brack, args=(n_samples, constant, channel))
+    lmax = optimize.brent(_neg_llf, brack=brack, args=(channel,))
 
     if not np.isinf(ymax):  # adjust the final lambda
         channel.send_all("lmb", "ymax")
@@ -198,10 +221,6 @@ def boxcox_normmax_client(x, channel):
 
     if np.any(x <= 0):
         raise ValueError("Data must be strictly positive.")
-
-    n_samples = x.size
-    constant = np.sum(np.log(x))
-    channel.send("n_samples_constant", [n_samples, constant])
 
     lmb = channel.recv("lmb")
     while isinstance(lmb, Number):
@@ -279,34 +298,124 @@ def yeojohnson_llf(lmb, data):
     return llf
 
 
-def yeojohnson_llf_server(lmb, n_samples, constant, channel):
+def yeojohnson_llf_server(lmb, channel):
     channel.send_all("lmb", lmb)
-    logvar = _log_var_server(n_samples, channel)
-    return (lmb - 1) * constant - n_samples / 2 * logvar
+    c = 0
+    triplet_pos, triplet_neg, triplet_mix = [], [], []
+
+    for c_i, n_pos_i, n_neg_i, logmean_i, logM2_i in channel.recv_all(
+        "c_npos_nneg_mu_m2"
+    ):
+
+        if n_pos_i + n_neg_i == 0:
+            continue
+
+        c += c_i
+
+        if n_neg_i == 0:
+            triplet_pos.append((n_pos_i, logmean_i, logM2_i))
+        elif n_pos_i == 0:
+            triplet_neg.append((n_neg_i, logmean_i, logM2_i))
+        else:
+            triplet_mix.append((n_pos_i + n_neg_i, logmean_i, logM2_i))
+
+    n_pos = 0
+    if len(triplet_pos) > 0:
+        n_pos, logmean_pos, logM2_pos = pairwise_var_server(triplet_pos)
+
+        if abs(lmb) >= np.spacing(1.0):
+            logM2_pos -= 2 * np.log(abs(lmb))
+
+    n_neg = 0
+    if len(triplet_neg) > 0:
+        n_neg, logmean_neg, logM2_neg = pairwise_var_server(triplet_neg)
+
+        if abs(lmb - 2) >= np.spacing(1.0):
+            logM2_neg -= 2 * np.log(abs(2 - lmb))
+
+    n_mix = 0
+    if len(triplet_mix) > 0:
+        n_mix, logmean_mix, logM2_mix = pairwise_var_server(triplet_mix)
+
+    if n_pos > 0 and (n_neg > 0 or n_mix > 0):
+        logmean_pos = logmean_pos.astype(np.complex128)
+        if abs(lmb) >= np.spacing(1.0):
+            logmean_pos = special.logsumexp(
+                [
+                    logmean_pos,
+                    np.full_like(logmean_pos, np.pi * 1j, dtype=np.complex128),
+                ],
+                axis=0,
+            ) - np.log(lmb + 0j)
+
+    if n_neg > 0 and (n_pos > 0 or n_mix > 0):
+        logmean_neg = logmean_neg.astype(np.complex128)
+        if abs(lmb - 2) >= np.spacing(1.0):
+            logmean_neg = special.logsumexp(
+                [
+                    logmean_neg,
+                    np.full_like(logmean_neg, np.pi * 1j, dtype=np.complex128),
+                ],
+                axis=0,
+            ) - np.log(lmb - 2 + 0j)
+
+    triplet = []
+    if n_pos > 0:
+        triplet.append((n_pos, logmean_pos, logM2_pos))
+    if n_neg > 0:
+        triplet.append((n_neg, logmean_neg, logM2_neg))
+    if n_mix > 0:
+        triplet.append((n_mix, logmean_mix, logM2_mix))
+
+    n, _, logM2 = pairwise_var_server(triplet)
+    logvar = logM2 - np.log(n)
+    return (lmb - 1) * c - n / 2 * logvar
 
 
 def yeojohnson_llf_client(lmb, data, channel):
-    logyj = np.zeros_like(data, dtype=np.complex128)
+    n = len(data)
     pos = data >= 0  # binary mask
+    n_pos = np.sum(pos)
+    n_neg = n - n_pos
 
-    # when data >= 0
-    if abs(lmb) < np.spacing(1.0):
-        logyj[pos] = np.log(np.log1p(data[pos]) + 0j)
-    else:  # lmbda != 0
-        logm1_pos = np.full_like(data[pos], np.pi * 1j, dtype=np.complex128)
-        logyj[pos] = special.logsumexp(
-            [lmb * special.log1p(data[pos]), logm1_pos], axis=0
-        ) - np.log(lmb + 0j)
+    if n_neg == 0:  # all positive
+        if abs(lmb) < np.spacing(1.0):
+            with np.errstate(divide="ignore"):
+                logyj = np.log(special.log1p(data) + 0j)
+        else:  # lmb != 0
+            logyj = lmb * special.log1p(data)
 
-    # when data < 0
-    if abs(lmb - 2) > np.spacing(1.0):
-        logm1_neg = np.full_like(data[~pos], np.pi * 1j, dtype=np.complex128)
-        logyj[~pos] = special.logsumexp(
-            [(2 - lmb) * special.log1p(-data[~pos]), logm1_neg], axis=0
-        ) - np.log(lmb - 2 + 0j)
-    else:  # lmbda == 2
-        logyj[~pos] = np.log(-np.log1p(-data[~pos]) + 0j)
-    _log_var_client(logyj, channel)
+    elif n_pos == 0:  # all negative
+        if abs(lmb - 2) < np.spacing(1.0):
+            logyj = np.log(-special.log1p(-data) + 0j)
+        else:  # lmb != 2
+            logyj = (2 - lmb) * special.log1p(-data)
+
+    else:  # mixed positive and negative
+        logyj = np.zeros_like(data, dtype=np.complex128)
+
+        # x >= 0
+        if abs(lmb) < np.spacing(1.0):
+            with np.errstate(divide="ignore"):
+                logyj[pos] = np.log(special.log1p(data[pos]) + 0j)
+        else:  # lmbda != 0
+            logm1_pos = np.full_like(data[pos], np.pi * 1j, dtype=np.complex128)
+            logyj[pos] = special.logsumexp(
+                [lmb * special.log1p(data[pos]), logm1_pos], axis=0
+            ) - np.log(lmb + 0j)
+
+        # x < 0
+        if abs(lmb - 2) < np.spacing(1.0):
+            logyj[~pos] = np.log(-special.log1p(-data[~pos]) + 0j)
+        else:  # lmbda != 2
+            logm1_neg = np.full_like(data[~pos], np.pi * 1j, dtype=np.complex128)
+            logyj[~pos] = special.logsumexp(
+                [(2 - lmb) * special.log1p(-data[~pos]), logm1_neg], axis=0
+            ) - np.log(lmb - 2 + 0j)
+
+    logmean, logM2 = pairwise_var_client(logyj)
+    c = np.sum(np.sign(data) * special.log1p(np.abs(data)))
+    channel.send("c_npos_nneg_mu_m2", [c, n_pos, n_neg, logmean, logM2])
 
 
 def _yeojohnson_transform(x, lmbda):
@@ -428,8 +537,8 @@ def yeojohnson_normmax(x, brack=(-2, 2), *, ymax=_BigFloat()):
 
 
 def yeojohnson_normmax_server(channel, brack=(-2, 2), *, ymax=_BigFloat()):
-    def _neg_llf(lmb, n_samples, constant, channel):
-        return -yeojohnson_llf_server(lmb, n_samples, constant, channel)
+    def _neg_llf(lmb, channel):
+        return -yeojohnson_llf_server(lmb, channel)
 
     end_msg = "exceed specified `ymax`."
     if isinstance(ymax, _BigFloat):
@@ -440,11 +549,7 @@ def yeojohnson_normmax_server(channel, brack=(-2, 2), *, ymax=_BigFloat()):
     elif ymax <= 0:
         raise ValueError("`ymax` must be strictly positive")
 
-    n_samples_constant = channel.recv_all("n_samples_constant")
-    n_samples_constant = np.sum(n_samples_constant, axis=0)
-    n_samples, constant = n_samples_constant[0], n_samples_constant[1]
-
-    lmax = optimize.brent(_neg_llf, brack=brack, args=(n_samples, constant, channel))
+    lmax = optimize.brent(_neg_llf, brack=brack, args=(channel,))
 
     if not np.isinf(ymax):  # adjust the final lambda
         channel.send_all("lmb", "ymax")
@@ -465,10 +570,6 @@ def yeojohnson_normmax_client(x, channel):
 
     if x.size == 0:
         raise ValueError("Data must not be empty.")
-
-    n_samples = x.size
-    constant = np.sum(np.sign(x) * np.log1p(np.abs(x)))
-    channel.send("n_samples_constant", [n_samples, constant])
 
     lmb = channel.recv("lmb")
     while isinstance(lmb, Number):
