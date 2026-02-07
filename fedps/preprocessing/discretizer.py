@@ -96,63 +96,63 @@ class KBinsDiscretizer(_PreprocessBase):
             elif self.role == "server":
                 output_dtype = np.float64
 
-        if self.module.strategy in ("uniform", "kmeans"):
-            data_min, data_max = col_min_max(
-                FL_type="H",
-                role=self.role,
-                X=X if self.role == "client" else None,
-                ignore_nan=False,
-                channel=self.channel,
-            )
+        data_min, data_max = col_min_max(
+            FL_type="H",
+            role=self.role,
+            X=X if self.role == "client" else None,
+            ignore_nan=False,
+            channel=self.channel,
+        )
 
-            if self.role == "server":
-                n_features = data_max.shape[0]
-                n_bins = self.module._validate_n_bins(n_features)
+        if self.role == "server":
+            n_features = data_max.shape[0]
+            n_bins = self.module._validate_n_bins(n_features)
 
-            bin_edges = np.zeros(n_features, dtype=object)
-            for jj in range(n_features):
-                col_max = data_max[jj]
-                col_min = data_min[jj]
+        bin_edges = np.zeros(n_features, dtype=object)
+        for jj in range(n_features):
+            col_max = data_max[jj]
+            col_min = data_min[jj]
 
-                if col_min == col_max:
-                    warnings.warn(
-                        "Feature %d is constant and will be replaced with 0." % jj
-                    )
-                    n_bins[jj] = 1
-                    bin_edges[jj] = np.array([-np.inf, np.inf])
-                    continue
+            if col_min == col_max:
+                warnings.warn(
+                    "Feature %d is constant and will be replaced with 0." % jj
+                )
+                n_bins[jj] = 1
+                bin_edges[jj] = np.array([-np.inf, np.inf])
+                continue
 
-                if self.module.strategy == "uniform":
-                    bin_edges[jj] = np.linspace(col_min, col_max, n_bins[jj] + 1)
-                else:  # "kmeans"
-                    from ..model import KMeans
+            if self.module.strategy == "uniform":
+                bin_edges[jj] = np.linspace(col_min, col_max, n_bins[jj] + 1)
+            elif self.module.strategy == "kmeans":
+                from ..model import KMeans
 
-                    # Deterministic initialization with uniform spacing
-                    uniform_edges = np.linspace(col_min, col_max, n_bins[jj] + 1)
-                    init = (uniform_edges[1:] + uniform_edges[:-1])[:, None] * 0.5
+                # Deterministic initialization with uniform spacing
+                uniform_edges = np.linspace(col_min, col_max, n_bins[jj] + 1)
+                init = (uniform_edges[1:] + uniform_edges[:-1])[:, None] * 0.5
 
-                    # 1D k-means procedure
-                    km = KMeans(
-                        FL_type="H",
-                        role=self.role,
-                        channel=self.channel,
-                        n_clusters=n_bins[jj],
-                        init=init,
-                        n_init=1,
-                    )
-                    centers = km.fit(
-                        X[:, jj][:, None] if self.role == "client" else None
-                    ).module.cluster_centers_[:, 0]
-                    # Must sort, centers may be unsorted even with sorted init
-                    centers.sort()
-                    bin_edges[jj] = (centers[1:] + centers[:-1]) * 0.5
-                    bin_edges[jj] = np.r_[col_min, bin_edges[jj], col_max]
-                    self._rm_bins_small_width(jj, bin_edges, n_bins)
+                # 1D k-means procedure
+                km = KMeans(
+                    FL_type="H",
+                    role=self.role,
+                    channel=self.channel,
+                    n_clusters=n_bins[jj],
+                    init=init,
+                    n_init=1,
+                )
+                centers = km.fit(
+                    X[:, jj][:, None] if self.role == "client" else None
+                ).module.cluster_centers_[:, 0]
+                # Must sort, centers may be unsorted even with sorted init
+                centers.sort()
+                bin_edges[jj] = (centers[1:] + centers[:-1]) * 0.5
+                bin_edges[jj] = np.r_[col_min, bin_edges[jj], col_max]
+                self._rm_bins_small_width(jj, bin_edges, n_bins)
 
-        elif self.module.strategy == "quantile":
-            if self.role == "client":
+        if self.module.strategy == "quantile":
+            mask = data_min != data_max
+            if self.role == "client" and np.any(mask):
                 send_local_quantile_sketch(
-                    X,
+                    X[:, mask],
                     self.channel,
                     sketch_name=self.sketch_name,
                     k=self.k,
@@ -169,7 +169,7 @@ class KBinsDiscretizer(_PreprocessBase):
                         )
                         n_bins[jj] = new_n_bins
 
-            elif self.role == "server":
+            elif self.role == "server" and np.any(mask):
                 sketch = merge_local_quantile_sketch(
                     channel=self.channel,
                     sketch_name=self.sketch_name,
@@ -177,35 +177,21 @@ class KBinsDiscretizer(_PreprocessBase):
                     is_hra=self.is_hra,
                 )
 
-                if self.sketch_name == "KLL":
-                    n_features = sketch.get_d()
-                    min_equal_max = sketch.get_min_values() == sketch.get_max_values()
-                elif self.sketch_name == "REQ":
-                    n_features = len(sketch)
-                    min_equal_max = [
-                        col_sketch.get_min_value() == col_sketch.get_max_value()
-                        for col_sketch in sketch
-                    ]
-
-                n_bins = self.module._validate_n_bins(n_features)
-
-                bin_edges = np.zeros(n_features, dtype=object)
+                ii = 0
                 for jj in range(n_features):
-                    if min_equal_max[jj]:
-                        warnings.warn(
-                            "Feature %d is constant and will be replaced with 0." % jj
-                        )
-                        n_bins[jj] = 1
-                        bin_edges[jj] = np.array([-np.inf, np.inf])
+                    if not mask[jj]:
                         continue
 
-                    quantiles = np.linspace(0, 1, n_bins[jj] + 1)
+                    quantiles = np.linspace(0, 1, n_bins[jj] + 1)[1:-1]
                     if self.sketch_name == "KLL":
-                        bin_edges[jj] = sketch.get_quantiles(quantiles, isk=jj).reshape(
+                        bin_edges[jj] = sketch.get_quantiles(quantiles, isk=ii).reshape(
                             -1
                         )
                     elif self.sketch_name == "REQ":
-                        bin_edges[jj] = np.array(sketch[jj].get_quantiles(quantiles))
+                        bin_edges[jj] = np.array(sketch[ii].get_quantiles(quantiles))
+
+                    bin_edges[jj] = np.r_[data_min[jj], bin_edges[jj], data_max[jj]]
+                    ii += 1
 
                     self._rm_bins_small_width(jj, bin_edges, n_bins)
 
