@@ -1,12 +1,11 @@
-# FedPS
+# FedPS: Federated data Preprocessing via aggregated Statistics
 
-FedPS is a Python module designed for data preprocessing in Federated Learning, primarily leveraging aggregated statistics. The preprocessing workflow involves the following five steps:
-
-1. Local Statistics Estimation: Clients estimate local statistics from their local data.
-2. Aggregation: The server receives the local statistics and performs aggregation.
-3. Global Parameter Calculation: The server calculates the global preprocessing parameters.
-4. Parameter Distribution: The global parameters are then sent back to the clients.
-5. Data Preprocessing: Clients apply the preprocessing to their local data.
+The workflow consists of five steps:
+① Compute local statistics;
+② Share and aggregate statistics;
+③ Derive preprocessing parameters;
+④ Broadcast parameters to clients;
+⑤ Apply preprocessing locally.
 
 <div align=center>
     <img src="doc/overview.svg", alt="Overview", width="60%">
@@ -19,7 +18,7 @@ FedPS is a Python module designed for data preprocessing in Federated Learning, 
 - Python (>= 3.10)
 - Scikit-learn (~= 1.7)
 - NumPy (>= 1.20)
-- DataSketches
+- DataSketches (<= 4.1.0)
 - PyZMQ
 
 ### Building from source
