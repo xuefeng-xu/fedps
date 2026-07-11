@@ -424,7 +424,6 @@ class SplineTransformer(_PreprocessBase):
                 is_hra=self.is_hra,
                 channel=self.channel,
             )
-            knots = np.transpose(knots)
 
         else:
             # knots == 'uniform':
