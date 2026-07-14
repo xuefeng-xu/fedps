@@ -821,7 +821,10 @@ class TargetEncoder(_PreprocessBase, _SKL_BaseEncoder, auto_wrap_output_keys=Non
                     sums += client_feat_sums[client_idx][feat_idx]
                     counts += client_feat_counts[client_idx][feat_idx]
 
-                encodings.append(sums / counts)
+                encoding_vec = np.full(sums.shape, y_mean)
+                mask = counts > 0
+                encoding_vec[mask] = sums[mask] / counts[mask]
+                encodings.append(encoding_vec)
 
             self.channel.send_all("encodings", encodings)
 
@@ -882,18 +885,21 @@ class TargetEncoder(_PreprocessBase, _SKL_BaseEncoder, auto_wrap_output_keys=Non
                     counts += client_feat_counts[client_idx][feat_idx]
                     sum_squares += client_feat_sum_squares[client_idx][feat_idx]
 
-                means = sums / counts
-                sum_of_squared_diffs = sum_squares - sums**2 / counts
+                with np.errstate(invalid="ignore"):
+                    means = sums / counts
+                    sum_of_squared_diffs = sum_squares - sums**2 / counts
 
-                if y_variance == 0.0:
-                    encodings.append(np.full(sum_squares.shape, y_mean))
-                else:
-                    lambda_ = (
-                        y_variance
-                        * counts
-                        / (y_variance * counts + sum_of_squared_diffs / counts)
-                    )
-                    encodings.append(lambda_ * means + (1 - lambda_) * y_mean)
+                lambda_ = (
+                    y_variance
+                    * counts
+                    / (y_variance * counts + sum_of_squared_diffs / counts)
+                )
+                mask = np.isnan(lambda_)
+                encoding_vec = np.full(sum_squares.shape, y_mean)
+                encoding_vec[~mask] = (
+                    lambda_[~mask] * means[~mask] + (1 - lambda_[~mask]) * y_mean
+                )
+                encodings.append(encoding_vec)
 
             self.channel.send_all("encodings", encodings)
 
