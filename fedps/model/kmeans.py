@@ -163,16 +163,73 @@ class KMeans(_ModelBase):
                     centers_new[j] = np.sum(X[mask], axis=0)
                     weight_in_clusters[j] = np.sum(mask)
 
-                self.channel.send("centers_new", centers_new)
                 self.channel.send("weight_in_clusters", weight_in_clusters)
+                n_empty_clusters = self.channel.recv("n_empty_clusters")
+                if n_empty_clusters > 0:
+                    dist = np.sum((X - centers_old[labels]) ** 2, axis=1)
+                    self.channel.send("max_dist", max(dist))
+                    mdist_g0 = self.channel.recv("mdist_g0")
+
+                    if mdist_g0:
+                        n_dist = min(n_empty_clusters, len(dist))
+                        far_from_centers = np.argpartition(dist, -n_dist)[-n_dist:][
+                            ::-1
+                        ]
+                        self.channel.send(
+                            "far_dist_label",
+                            (dist[far_from_centers], labels[far_from_centers]),
+                        )
+
+                        change_cluster = self.channel.recv("change_cluster")
+                        if len(change_cluster) > 0:
+                            for new_cluster, far_idx in zip(
+                                change_cluster, far_from_centers[: len(change_cluster)]
+                            ):
+                                old_cluster = labels[far_idx]
+                                centers_new[old_cluster] -= X[far_idx]
+                                centers_new[new_cluster] += X[far_idx]
+
+                self.channel.send("centers_new", centers_new)
                 centers_new = self.channel.recv("centers_new")
 
         elif self.role == "server":
             if update_centers:
-                centers_new = self.channel.recv_all("centers_new")
                 weight_in_clusters = self.channel.recv_all("weight_in_clusters")
-                centers_new = np.sum(centers_new, axis=0)
                 weight_in_clusters = np.sum(weight_in_clusters, axis=0)
+
+                empty_clusters = np.where(weight_in_clusters == 0)[0]
+                n_empty_clusters = len(empty_clusters)
+                self.channel.send_all("n_empty_clusters", n_empty_clusters)
+
+                if n_empty_clusters > 0:
+                    mdist_g0 = max(self.channel.recv_all("max_dist")) > 0
+                    self.channel.send_all("mdist_g0", mdist_g0)
+
+                    if mdist_g0:
+                        far_dist_label_client = self.channel.recv_all("far_dist_label")
+
+                        far_dist = np.array([], dtype=float)
+                        far_label = np.array([], dtype=int)
+                        client_idx = np.array([], dtype=int)
+                        for ci, (dist, label) in enumerate(far_dist_label_client):
+                            far_dist = np.r_[far_dist, dist]
+                            far_label = np.r_[far_label, label]
+                            client_idx = np.r_[client_idx, np.full(len(dist), ci)]
+
+                        far_from_centers = np.argpartition(far_dist, -n_empty_clusters)[
+                            -n_empty_clusters:
+                        ][::-1]
+
+                        n_client = len(far_dist_label_client)
+                        change_cluster = [[] for _ in range(n_client)]
+                        for i, idx in enumerate(far_from_centers):
+                            change_cluster[client_idx[idx]].append(empty_clusters[i])
+                            weight_in_clusters[empty_clusters[i]] += 1
+                            weight_in_clusters[far_label[idx]] -= 1
+                        self.channel.send_all_diff("change_cluster", change_cluster)
+
+                centers_new = self.channel.recv_all("centers_new")
+                centers_new = np.sum(centers_new, axis=0)
 
                 argmax_weight = np.argmax(weight_in_clusters)
                 for j in range(centers_new.shape[0]):
